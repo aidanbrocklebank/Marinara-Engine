@@ -913,7 +913,8 @@ export function createChatsStorage(db: DB) {
     /** Bidirectionally link two chats. Severs any pre-existing mutual link on
      *  either side first so we don't strand a third chat with a dangling
      *  reference. The whole disconnect & reconnect sequence runs in a single
-     *  transaction so a mid-flight failure can't leave a one-sided link. */
+     *  transaction so a mid-flight failure can't leave a one-sided link.
+     *  Any existing OOC influences or notes are also cleared from both chats. */
     async connectChats(chatIdA: string, chatIdB: string) {
       await db.transaction(async (tx) => {
         // Clear notes and influences for the chats before disconnecting them,
@@ -944,9 +945,9 @@ export function createChatsStorage(db: DB) {
       await conn.delete(oocInfluences).where(eq(oocInfluences.targetChatId, chatId));
     },
 
-    /** Remove the bidirectional link for a chat (and its partner). Only nulls
-     *  the partner row when it points back to this chat, otherwise we would
-     *  sever an unrelated link. */
+    /** Remove the bidirectional link for a chat (and its partner). This only
+     *  nulls the partner row when it points back to this chat (enforced by the
+     *  WHERE clause), otherwise we would sever an unrelated link. */
     async disconnectChat(chatId: string, opts?: { tx?: Pick<DB, "select" | "update"> }) {
       const conn = opts?.tx ?? db;
       const rows = await conn.select().from(chats).where(eq(chats.id, chatId));
